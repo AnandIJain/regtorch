@@ -9,10 +9,11 @@ from sklearn.preprocessing import StandardScaler
 
 train_fn = 'col'
 test_fn = 'college'
-
+num_cols = 0
 
 scaler = StandardScaler()
 cols = 0
+
 headers = ['a_team', 'h_team', 'league', 'game_id',
                 'a_pts', 'h_pts', 'secs', 'status', 'a_win', 'h_win', 'last_mod_to_start',
                 'num_markets', 'a_odds_ml', 'h_odds_ml', 'a_hcap_tot', 'h_hcap_tot']
@@ -30,6 +31,7 @@ def scale(data):
 
 df = read_csv(train_fn, 1)
 cols = df.columns
+num_cols = len(cols)
 df = scale(df)
 
 def features(df):
@@ -45,7 +47,7 @@ X, Y = features(df)
 class Net(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.linear = torch.nn.Linear(53, 1)
+        self.linear = torch.nn.Linear(num_cols - 1, 1)  # its num_cols = 1 because the 1 is the label
 
     def forward(self, x):
         y_pred = self.linear(x)
@@ -57,7 +59,7 @@ loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
 optimizer = torch.optim.SGD(net.parameters(), lr=0.01)
 
 def run(data, labels):  # train == 1, test == else
-    for epoch in range(200):
+    for epoch in range(500):
         y_pred = net(data)
         print('predicted: ' + str(y_pred[epoch].item()))
         print('real: ' + str(labels[epoch].item()))
