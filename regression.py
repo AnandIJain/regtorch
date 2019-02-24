@@ -7,6 +7,10 @@ import numpy as np
 
 from sklearn.preprocessing import StandardScaler
 
+train_fn = 'col'
+test_fn = 'college'
+
+
 scaler = StandardScaler()
 cols = 0
 headers = ['a_team', 'h_team', 'league', 'game_id',
@@ -24,7 +28,7 @@ def scale(data):
     scaled = scaler.fit_transform(data.values)
     return scaled
 
-df = read_csv('nba2', 1)
+df = read_csv(train_fn, 1)
 cols = df.columns
 df = scale(df)
 
@@ -52,27 +56,35 @@ net = Net()
 loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
 optimizer = torch.optim.SGD(net.parameters(), lr=0.01)
 
-def run(train_test, data, labels):  # train == 1, test == else
+def run(data, labels):  # train == 1, test == else
     for epoch in range(200):
         y_pred = net(data)
-        loss = loss_func(y_pred, labels)
-
-        if train_test == 1:  
-            plt.scatter(epoch, loss.item(), color='r', s=10, marker='o')
-        else:
-            plt.scatter(epoch, loss.item(), color='b', s=10, marker='o')
+        print('predicted: ' + str(y_pred[epoch].item()))
+        print('real: ' + str(labels[epoch].item()))
+        error = y_pred - labels
+        print('error: ' + str(error[epoch].item()))
+        loss = loss_func(y_pred, labels) 
+        print(loss)
+        plt.scatter(epoch, loss.item(), color='r', s=10, marker='o')
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-run(1, X, Y)
+run(X, Y)
 
-test = read_csv('data', 0)
+test = read_csv(test_fn, 0)
 test = test.reindex(columns=cols, fill_value=0)
 test = scale(test)
 X_test, Y_test = features(test)
 
-run(0, X_test, Y_test)
+print("if u have {}, a_pts is: ", net(X_test[0]).item())
+print('real is ', Y_test[0].item())
+
+def test(test_data, test_labels):
+    for e in range(200):
+        y_pred = net(data)
+
+
 
 plt.show()
