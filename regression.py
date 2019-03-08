@@ -21,17 +21,21 @@ class Df(Dataset):
     def __init__(self, df):
         # self.to_tensor = torch.tensor()
         self.data_len = len(df.index)
-        self.labels = df['a_odds_ml']
-        print(self.labels)
+        self.labels = df['a_odds_ml'].values
+        # print([self.data_len, self.labels])
         self.data = df.drop(['a_odds_ml'], axis=1)
+        self.data = self.data.values
 
     def __getitem__(self, index):
-        line = self.data.iloc[index, :]
+        line = self.data[index, :]
+        print(len(line))
         line_tensor = torch.tensor(line)
         line_label = self.labels[index]
-        label_tensor = torch.tensor(line_label)
-
-        return (line_tensor, label_tensor)
+        print(line_label)
+        # label_tensor = torch.tensor(line_label)
+        # tup = (len(line_tensor), len(label_tensor))
+        # print(tup)
+        return (line_tensor, line_label)
 
     def __len__(self):
         return self.data_len
@@ -55,39 +59,28 @@ def scale(data):
     scaled = scaler.fit_transform(data.values)
     return scaled
  
-def get_batch(df, col='a_odds_ml', batch_size=1):
-    batch = df.sample(batch_size)
-    Y = batch[col]
-    Y = Y.values
-    Y = torch.tensor(Y, dtype=torch.float)
-    X = batch.drop([col], axis=1)
-    X = X.values
-    X = torch.tensor(X, dtype=torch.float)
-    return X, Y
-
 
 tmp_df = read_csv(fn)
 train, test = train_test(tmp_df)
+# print(type(train))
 train = Df(train)
 test = Df(test)
-
-# print(ttrain.shape)
 
 
 num_cols = train.data.shape[1]
 
 input_size = num_cols
 hidden_size = 50
-num_classes = 3
+num_classes = 1
 num_epochs = 5
-batch_size = 100
+batch_size = 1 
 learning_rate = 0.01
 
 train_loader = DataLoader(dataset=train, batch_size=batch_size, shuffle=True)
-data, label = enumerate(train_loader)
-print(data)
-print('label')
-print(label)
+# data, label = enumerate(train)
+# print(data)
+# print('label')
+# print(label)
 
 test_loader = DataLoader(dataset=test, batch_size=batch_size, shuffle=False)
 
@@ -111,15 +104,21 @@ lr = 1e-4
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
-EPOCHS = 600
+EPOCHS = 1
 print(batch_size)
 steps = 0
+running_loss = 0
 for i in range(EPOCHS):
     for j, (data, labels) in enumerate(train_loader):
         y_pred = net(data)
+        print(y_pred)
+        print(labels)
         loss = criterion(y_pred, labels) 
+        print(loss)
         plt.scatter(steps, loss.item(), color='r', s=10, marker='o')
-
+        running_loss += abs(loss)
+        print(running_loss)
+        print(running_loss / j)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
