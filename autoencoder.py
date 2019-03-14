@@ -15,6 +15,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import numpy as np
 import pandas as pd
+
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 
@@ -28,12 +29,13 @@ N_TEST_IMG = 5
 
 
 class Df(Dataset):
-    def __init__(self, np_df):
+    def __init__(self, np_df, unscaled):
         # self.to_tensor = torch.tensor()
         self.data_len = len(np_df)
         # self.data_len = len(np_df.index)
         self.data = np_df
-        self.t_data = torch.tensor(self.data)
+        # self.t_data = torch.tensor(self.data)
+        self.unscaled_data = unscaled
         print(self.data_len)
 
     def __getitem__(self, index):
@@ -48,9 +50,10 @@ class Df(Dataset):
 
 
 def read_csv(fn='nba2'):  # read csv and scale data
-    raw = pd.read_csv(fn + '.csv', usecols=headers)
+    raw = pd.read_csv(fn + '.csv')
     raw = raw.dropna()
-    # raw = pd.get_dummies(data=raw, columns=['a_team', 'h_team', 'league', 'sport'])
+    raw = pd.get_dummies(data=raw, columns=[ 'a_team', 'h_team', 'league', 'sport'])
+    raw = raw.drop(['game_id', 'lms_date', 'lms_time'], axis=1)
     print(raw.columns)
     # raw = raw.astype(np.float32)
     raw = raw.sort_values('cur_time', axis=0)
@@ -75,8 +78,8 @@ train_df, test_df = train_test(tmp_df)
 scaled_train = scale(train_df)
 scaled_test = scale(test_df)
 
-train = Df(scaled_train)
-test = Df(scaled_test)
+train = Df(scaled_train, train_df.values)
+test = Df(scaled_test, test_df.values)
 
 
 batch_size = 1
@@ -105,10 +108,10 @@ class AutoEncoder(nn.Module):
             nn.Tanh(),
             nn.Linear(64, 12),
             nn.Tanh(),
-            nn.Linear(12, 2),   # compress to n features which can be visualized in plt
+            nn.Linear(12, 10),   # compress to n features which can be visualized in plt
         )
         self.decoder = nn.Sequential(
-            nn.Linear(2, 12),
+            nn.Linear(10, 12),
             nn.Tanh(),
             nn.Linear(12, 64),
             nn.Tanh(),
@@ -130,25 +133,25 @@ optimizer = torch.optim.Adam(autoencoder.parameters(), lr=LR)
 loss_func = nn.MSELoss()
 
 # initialize figure
-f, a = plt.subplots(2, N_TEST_IMG, figsize=(5, 2))
+f, a = plt.subplots(2, N_TEST_IMG, figsize=(10, 6))
 plt.ion()   # continuously plot
 
 # original data (first row) for viewing
-view_data = train.t_data.view(-1, num_cols).type(torch.FloatTensor)/255.
+view_data = torch.tensor(train.data).view(-1, num_cols).type(torch.FloatTensor)/255.
 for i in range(N_TEST_IMG):
-    a[0][i].imshow(np.reshape(view_data.data.numpy()[i], (7, 2)), cmap='gray'); a[0][i].set_xticks(()); a[0][i].set_yticks(())
+    a[0][i].imshow(np.reshape(view_data.data.numpy()[i], (9, 10)), cmap='brg'); a[0][i].set_xticks(()); a[0][i].set_yticks(())
 
 for epoch in range(EPOCH):
     for step, x in enumerate(train_loader):
-        b_x = x.view(-1, num_cols).float()   # batch x, shape (batch, 28*28)
-        b_y = x.view(-1, num_cols).float()   # batch y, shape (batch, 28*28)
-        print(x)
+        b_x = x.view(-1, num_cols).float()
+        b_y = x.view(-1, num_cols).float()
+
         encoded, decoded = autoencoder(b_x)
 
-        loss = loss_func(decoded, b_y)      # mean square error
-        optimizer.zero_grad()               # clear gradients for this training step
-        loss.backward()                     # backpropagation, compute gradients
-        optimizer.step()                    # apply gradients
+        loss = loss_func(decoded, b_y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
         if step % 100 == 0:
             print('Epoch: ', epoch, '| train loss: %.4f' % loss.data.numpy())
@@ -157,7 +160,7 @@ for epoch in range(EPOCH):
             _, decoded_data = autoencoder(view_data)
             for i in range(N_TEST_IMG):
                 a[1][i].clear()
-                a[1][i].imshow(np.reshape(decoded_data.data.numpy()[i], (7, 2)), cmap='gray')
+                a[1][i].imshow(np.reshape(decoded_data.data.numpy()[i], (9, 10)), cmap='brg')
                 a[1][i].set_xticks(()); a[1][i].set_yticks(())
             plt.draw(); plt.pause(0.05)
 
@@ -165,12 +168,17 @@ plt.ioff()
 plt.show()
 
 # visualize in 3D plot
-view_data = test.t_data[:200].view(-1, num_cols).type(torch.FloatTensor)/255.
+view_data = test.t_data[:200].view(-1, 91).type(torch.FloatTensor)/255.
+
 encoded_data, _ = autoencoder(view_data)
+
 fig = plt.figure(2); ax = Axes3D(fig)
+
 X, Y, Z = encoded_data.data[:, 0].numpy(), encoded_data.data[:, 1].numpy(), encoded_data.data[:, 2].numpy()
 values = train_data.train_labels[:200].numpy()
+
 for x, y, z, s in zip(X, Y, Z, values):
     c = cm.rainbow(int(255*s/9)); ax.text(x, y, z, s, backgroundcolor=c)
+
 ax.set_xlim(X.min(), X.max()); ax.set_ylim(Y.min(), Y.max()); ax.set_zlim(Z.min(), Z.max())
 plt.show()
