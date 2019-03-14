@@ -42,8 +42,9 @@ class Df(Dataset):
         # line = self.data.iloc[index]
         line = self.data[index]
         line_tensor = torch.tensor(line)
-        # print(line_tensor.dtype)
-        return line_tensor
+        unscaled_line = self.unscaled_data[index]
+        unscaled_tensor = torch.tensor(unscaled_line)        
+        return line_tensor, unscaled_tensor
 
     def __len__(self):
         return self.data_len
@@ -72,6 +73,7 @@ def scale(data):
     print(scaled.shape)
     return scaled
 
+
 tmp_df = read_csv()
 train_df, test_df = train_test(tmp_df)
 
@@ -98,7 +100,7 @@ test_loader = DataLoader(dataset=test, batch_size=batch_size, shuffle=False)
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, batch_size):
         super(AutoEncoder, self).__init__()
 
         self.encoder = nn.Sequential(
@@ -106,14 +108,22 @@ class AutoEncoder(nn.Module):
             nn.Tanh(),
             nn.Linear(128, 64),
             nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
             nn.Linear(64, 12),
             nn.Tanh(),
-            nn.Linear(12, 10),   # compress to n features which can be visualized in plt
+            nn.Linear(12, 3),   # compress to n features which can be visualized in plt
         )
         self.decoder = nn.Sequential(
-            nn.Linear(10, 12),
+            nn.Linear(3, 12),
             nn.Tanh(),
             nn.Linear(12, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
             nn.Tanh(),
             nn.Linear(64, 128),
             nn.Tanh(),
@@ -127,7 +137,7 @@ class AutoEncoder(nn.Module):
         return encoded, decoded
 
 
-autoencoder = AutoEncoder()
+autoencoder = AutoEncoder(batch_size)
 
 optimizer = torch.optim.Adam(autoencoder.parameters(), lr=LR)
 loss_func = nn.MSELoss()
@@ -141,14 +151,27 @@ view_data = torch.tensor(train.data).view(-1, num_cols).type(torch.FloatTensor)/
 for i in range(N_TEST_IMG):
     a[0][i].imshow(np.reshape(view_data.data.numpy()[i], (9, 10)), cmap='brg'); a[0][i].set_xticks(()); a[0][i].set_yticks(())
 
+cur_data = torch.randn(1, num_cols).float()
+
 for epoch in range(EPOCH):
-    for step, x in enumerate(train_loader):
-        b_x = x.view(-1, num_cols).float()
-        b_y = x.view(-1, num_cols).float()
+    for step, (x, unscaled) in enumerate(train_loader):
+        prev_data = cur_data
+        cur_data = x.float()
+        b_x = prev_data.view(-1, num_cols).float()
+        b_y = cur_data.view(-1, num_cols).float()
+        # pred = net(prev_data)
+        # encoded, decoded = autoencoder(b_x)
+        encoded, decoded = autoencoder(prev_data)
 
-        encoded, decoded = autoencoder(b_x)
+        loss = loss_func(decoded, cur_data)
+        with torch.no_grad():
+            if loss >= 2:
+                print('decoded: ')
+                print(decoded)
 
-        loss = loss_func(decoded, b_y)
+                print('cur_data: ')
+                print(cur_data)
+                # print(unscaled[0:20])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -167,8 +190,11 @@ for epoch in range(EPOCH):
 plt.ioff()
 plt.show()
 
+
+torch.save(net.state_dict(), 'auto.ckpt')
+
 # visualize in 3D plot
-view_data = test.t_data[:200].view(-1, 91).type(torch.FloatTensor)/255.
+view_data = torch.tensor(test.data).view(-1, 91).type(torch.FloatTensor)/255.
 
 encoded_data, _ = autoencoder(view_data)
 
@@ -181,4 +207,5 @@ for x, y, z, s in zip(X, Y, Z, values):
     c = cm.rainbow(int(255*s/9)); ax.text(x, y, z, s, backgroundcolor=c)
 
 ax.set_xlim(X.min(), X.max()); ax.set_ylim(Y.min(), Y.max()); ax.set_zlim(Z.min(), Z.max())
+torch.save(net.state_dict(), 'auto.ckpt')
 plt.show()
