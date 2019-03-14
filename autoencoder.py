@@ -67,10 +67,10 @@ def train_test(df):
 
 def scale(data):
     scaler = StandardScaler()
-    print(data)
+    # print(data)
     vals = data.to_numpy()
     scaled = scaler.fit_transform(vals)
-    print(scaled.shape)
+    # print(scaled.shape)
     return scaled
 
 
@@ -89,14 +89,10 @@ num_cols = tmp_df.shape[1]
 
 input_size = num_cols
 # output_size = 10
-learning_rate = 0.01
+learning_rate = 0.1
 
 train_loader = DataLoader(dataset=train, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(dataset=test, batch_size=batch_size, shuffle=False)
-
-# plot one example
-# print(scaled_train.train_data.size())     # (60000, 28, 28)
-# print(train_data.train_labels.size())   # (60000)
 
 
 class AutoEncoder(nn.Module):
@@ -114,10 +110,10 @@ class AutoEncoder(nn.Module):
             nn.Tanh(),
             nn.Linear(64, 12),
             nn.Tanh(),
-            nn.Linear(12, 3),   # compress to n features which can be visualized in plt
+            nn.Linear(12, 10),   # compress to n features which can be visualized in plt
         )
         self.decoder = nn.Sequential(
-            nn.Linear(3, 12),
+            nn.Linear(10, 12),
             nn.Tanh(),
             nn.Linear(12, 64),
             nn.Tanh(),
@@ -143,13 +139,15 @@ optimizer = torch.optim.Adam(autoencoder.parameters(), lr=LR)
 loss_func = nn.MSELoss()
 
 # initialize figure
-f, a = plt.subplots(2, N_TEST_IMG, figsize=(10, 6))
+f, a = plt.subplots(3, N_TEST_IMG, figsize=(10, 6))
 plt.ion()   # continuously plot
 
+print(train.data)
 # original data (first row) for viewing
-view_data = torch.tensor(train.data).view(-1, num_cols).type(torch.FloatTensor)/255.
+lt, ut = train.__getitem__(0)
+view_data = lt.view(-1, num_cols).type(torch.FloatTensor)/255.
 for i in range(N_TEST_IMG):
-    a[0][i].imshow(np.reshape(view_data.data.numpy()[i], (9, 10)), cmap='brg'); a[0][i].set_xticks(()); a[0][i].set_yticks(())
+    a[0][i].imshow(np.reshape(view_data.numpy(), (9, 10)), cmap='brg'); a[0][i].set_xticks(()); a[0][i].set_yticks(())
 
 cur_data = torch.randn(1, num_cols).float()
 
@@ -171,21 +169,29 @@ for epoch in range(EPOCH):
 
                 print('cur_data: ')
                 print(cur_data)
+
+                print('unscaled: ')
+                print(unscaled)
                 # print(unscaled[0:20])
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        if step % 100 == 0:
-            print('Epoch: ', epoch, '| train loss: %.4f' % loss.data.numpy())
-
-            # plotting decoded image (second row)
-            _, decoded_data = autoencoder(view_data)
-            for i in range(N_TEST_IMG):
-                a[1][i].clear()
-                a[1][i].imshow(np.reshape(decoded_data.data.numpy()[i], (9, 10)), cmap='brg')
-                a[1][i].set_xticks(()); a[1][i].set_yticks(())
-            plt.draw(); plt.pause(0.05)
+        if step % 10 == 0:
+            with torch.no_grad():
+                print('Epoch: ', epoch, '| train loss: %.4f' % loss.data.numpy())
+                view_data = x.view(-1, 90).type(torch.FloatTensor)/255.
+                # plotting decoded image (second row)
+                _, decoded_data = autoencoder(view_data)
+                for i in range(N_TEST_IMG):
+                    a[1][i].clear()
+                    a[1][i].imshow(np.reshape(decoded_data.numpy(), (9, 10)), cmap='brg')
+                    a[1][i].set_xticks(()); a[1][i].set_yticks(())
+                    
+                    a[2][i].clear()
+                    a[2][i].imshow(np.reshape(cur_data.numpy(), (9, 10)), cmap='brg')
+                    a[2][i].set_xticks(()); a[2][i].set_yticks(())
+                plt.draw(); plt.pause(0.05)
 
 plt.ioff()
 plt.show()
@@ -194,7 +200,7 @@ plt.show()
 torch.save(net.state_dict(), 'auto.ckpt')
 
 # visualize in 3D plot
-view_data = torch.tensor(test.data).view(-1, 91).type(torch.FloatTensor)/255.
+view_data = torch.tensor(test.__getitem__).view(-1, 91).type(torch.FloatTensor)/255.
 
 encoded_data, _ = autoencoder(view_data)
 
