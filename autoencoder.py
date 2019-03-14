@@ -75,7 +75,7 @@ train_df, test_df = train_test(tmp_df)
 scaled_train = scale(train_df)
 scaled_test = scale(test_df)
 
-train = Df(train_df, scaled_train)
+train = Df(scaled_train)
 test = Df(scaled_test)
 
 
@@ -105,10 +105,10 @@ class AutoEncoder(nn.Module):
             nn.Tanh(),
             nn.Linear(64, 12),
             nn.Tanh(),
-            nn.Linear(12, 10),   # compress to n features which can be visualized in plt
+            nn.Linear(12, 2),   # compress to n features which can be visualized in plt
         )
         self.decoder = nn.Sequential(
-            nn.Linear(10, 12),
+            nn.Linear(2, 12),
             nn.Tanh(),
             nn.Linear(12, 64),
             nn.Tanh(),
