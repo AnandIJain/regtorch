@@ -88,7 +88,7 @@ batch_size = 1
 num_cols = tmp_df.shape[1]
 
 input_size = num_cols
-output_size = 10
+# output_size = 10
 learning_rate = 0.01
 
 train_loader = DataLoader(dataset=train, batch_size=batch_size, shuffle=False)
